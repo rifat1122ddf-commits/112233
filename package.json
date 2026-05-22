@@ -1,0 +1,81 @@
+{
+  "name": "shadowrecon-ultimate",
+  "productName": "ShadowRecon Ultimate",
+  "version": "7.7.7",
+  "description": "World's largest penetration testing framework with 20,000+ tools, AI assistant, 7 pages, live map, and unlimited power.",
+  "main": "main.js",
+  "author": {
+    "name": "ShadowRecon Labs",
+    "email": "shadowrecon@local"
+  },
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --x64",
+    "build:linux": "electron-builder --linux",
+    "build:mac": "electron-builder --mac",
+    "pack": "electron-builder --dir",
+    "clean": "rimraf dist/ reports/ logs/ tools/ captures/ node_modules/.cache"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "axios": "^1.7.9",
+    "robotjs": "^0.6.0",
+    "screenshot-desktop": "^1.15.0",
+    "tesseract.js": "^5.1.0",
+    "node-notifier": "^10.0.1",
+    "archiver": "^7.0.1",
+    "extract-zip": "^2.0.1"
+  },
+  "devDependencies": {
+    "electron": "^42.2.0",
+    "electron-builder": "^26.8.1",
+    "rimraf": "^6.0.1"
+  },
+  "build": {
+    "appId": "com.shadowrecon.ultimate",
+    "productName": "ShadowRecon Ultimate",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!reports/**",
+      "!logs/**",
+      "!tools/**",
+      "!captures/**",
+      "!node_modules/.cache/**"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ShadowRecon Ultimate"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Development",
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.developer-tools"
+    }
+  }
+}
