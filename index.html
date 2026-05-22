@@ -1,1 +1,588 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>ShadowRecon Ultimate – সীমাহীন সাইবার শক্তি</title>
+  <!-- Leaflet CSS for World Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Google Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(ellipse at 20% 30%, #0a0f1a, #020408);
+      color: #e6f0ff;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* glassmorphism core */
+    .glass {
+      background: rgba(12, 18, 28, 0.55);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(64, 230, 255, 0.2);
+      border-radius: 24px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    }
+
+    /* custom scroll */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f1420; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #40e6ff; border-radius: 10px; }
+
+    /* layout */
+    .app-container {
+      display: flex;
+      height: 100vh;
+      width: 100%;
+    }
+
+    /* sidebar premium */
+    .sidebar {
+      width: 280px;
+      background: rgba(8, 11, 18, 0.75);
+      backdrop-filter: blur(16px);
+      border-right: 1px solid rgba(64,230,255,0.25);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 20;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+      padding-left: 8px;
+    }
+    .logo-icon {
+      font-size: 32px;
+      filter: drop-shadow(0 0 6px #ff3bd4);
+    }
+    .logo-text {
+      font-size: 20px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #40e6ff, #ff3bd4);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 18px;
+      border-radius: 20px;
+      color: #a0b3d9;
+      font-weight: 600;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .nav-item i { width: 28px; font-size: 1.2rem; }
+    .nav-item:hover, .nav-item.active {
+      background: rgba(64,230,255,0.12);
+      color: #40e6ff;
+      border-left: 3px solid #ff3bd4;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    /* main content */
+    .main-panel {
+      flex: 1;
+      padding: 20px 24px;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .page {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .page.active { display: block; }
+
+    @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
+
+    /* page header */
+    .page-header {
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #fff, #40e6ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      letter-spacing: -0.5px;
+    }
+
+    /* world map container */
+    .map-wrapper {
+      height: 65vh;
+      border-radius: 28px;
+      overflow: hidden;
+      border: 1px solid rgba(64,230,255,0.3);
+      background: #01040c;
+    }
+    #worldMap {
+      height: 100%;
+      width: 100%;
+    }
+
+    .map-toolbar {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .cyber-btn {
+      background: rgba(20,28,40,0.8);
+      border: 1px solid rgba(64,230,255,0.4);
+      border-radius: 40px;
+      padding: 8px 18px;
+      color: #d0e4ff;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cyber-btn:hover {
+      background: #40e6ff22;
+      border-color: #40e6ff;
+      color: white;
+      transform: scale(0.98);
+    }
+
+    /* webview area */
+    .webview-panel {
+      height: 70vh;
+      border-radius: 28px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid #40e6ff55;
+    }
+    webview {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* floating AI button (chat bot icon) */
+    .ai-assistant-btn {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      width: 64px;
+      height: 64px;
+      background: radial-gradient(circle at 30% 30%, #ff3bd4, #b8009a);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(255,59,212,0.6);
+      z-index: 1000;
+      transition: 0.2s;
+      border: 2px solid #ffffff88;
+    }
+    .ai-assistant-btn i {
+      font-size: 32px;
+      color: white;
+      filter: drop-shadow(0 0 4px black);
+    }
+    .ai-assistant-btn:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 28px #ff3bd4;
+    }
+
+    /* modal for AI (simple notification) */
+    .ai-modal {
+      position: fixed;
+      bottom: 100px;
+      right: 30px;
+      width: 320px;
+      background: #0c1220ee;
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      border-left: 4px solid #40e6ff;
+      padding: 16px;
+      box-shadow: 0 20px 35px rgba(0,0,0,0.5);
+      z-index: 1001;
+      display: none;
+      animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px);}
+      to { opacity: 1; transform: translateY(0);}
+    }
+
+    .report-table, .threat-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .report-table th, .report-table td {
+      padding: 12px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      text-align: left;
+    }
+
+    .tools-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+      max-height: 55vh;
+      overflow-y: auto;
+    }
+    .tool-card {
+      background: #11161f;
+      padding: 8px 14px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: 0.1s;
+      cursor: pointer;
+      border: 1px solid #2a3a55;
+    }
+    .tool-card:hover {
+      background: #40e6ff22;
+      border-color: #40e6ff;
+    }
+
+    .status-badge {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .status-green { background: #20ffb3; box-shadow:0 0 5px #20ffb3; }
+    .status-orange { background: #ffaa33; }
+    .status-red { background: #ff4d6d; }
+
+    .footer-lock {
+      margin-top: auto;
+      text-align: center;
+      padding-top: 20px;
+      color: #7a8db0;
+    }
+    .lock-icon {
+      cursor: pointer;
+      background: #161e2c;
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-size: 12px;
+    }
+
+    @media (max-width: 800px) {
+      .sidebar { width: 80px; padding: 20px 8px; }
+      .nav-item span:not(i) { display: none; }
+      .logo-text { display: none; }
+      .main-panel { padding: 16px; }
+    }
+  </style>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+<div class="app-container">
+  <!-- sidebar 7 pages -->
+  <div class="sidebar">
+    <div class="logo-area">
+      <div class="logo-icon">🐉</div>
+      <div class="logo-text">ShadowRecon</div>
+    </div>
+    <div class="nav-item active" data-page="page1"><i class="fas fa-globe-asia"></i> <span>লাইভ ম্যাপ</span></div>
+    <div class="nav-item" data-page="page2"><i class="fas fa-compass"></i> <span>WebView + স্ক্যান</span></div>
+    <div class="nav-item" data-page="page3"><i class="fas fa-file-alt"></i> <span>রিপোর্ট লাইব্রেরি</span></div>
+    <div class="nav-item" data-page="page4"><i class="fas fa-tools"></i> <span>টুলস & এক্সপ্লয়েট</span></div>
+    <div class="nav-item" data-page="page5"><i class="fas fa-chart-line"></i> <span>সিস্টেম মনিটর</span></div>
+    <div class="nav-item" data-page="page6"><i class="fas fa-lock"></i> <span>সিক্রেট পেজ</span></div>
+    <div class="nav-item" data-page="page7"><i class="fas fa-robot"></i> <span>অটোমেশন হাব</span></div>
+    <div class="footer-lock">
+      <div class="lock-icon" id="secretLockIcon"><i class="fas fa-key"></i> সিক্রেট লক</div>
+    </div>
+  </div>
+
+  <div class="main-panel">
+    <!-- PAGE 1: World Map -->
+    <div id="page1" class="page active">
+      <div class="page-header"><i class="fas fa-map-marked-alt"></i> লাইভ ওয়ার্ল্ড থ্রেট ম্যাপ</div>
+      <div class="map-wrapper glass"><div id="worldMap"></div></div>
+      <div class="map-toolbar">
+        <button class="cyber-btn" id="clearMarkersBtn"><i class="fas fa-trash-alt"></i> ক্লিয়ার মার্কার</button>
+        <button class="cyber-btn" id="screenshotMapBtn"><i class="fas fa-camera"></i> স্ক্রিনশট</button>
+        <div class="cyber-btn" style="background: #00000066;"><i class="fas fa-circle"></i> লাইভ টগল: <span id="liveToggleStatus">অন</span></div>
+        <input type="text" id="ipLocatorInput" placeholder="IP ঠিকানা দিন" style="background:#0f1420; border:1px solid cyan; border-radius:40px; padding:8px 16px; color:white;">
+        <button class="cyber-btn" id="locateIpBtn"><i class="fas fa-search-location"></i> ট্র্যাক</button>
+      </div>
+    </div>
+
+    <!-- PAGE 2: WebView + live scanner -->
+    <div id="page2" class="page">
+      <div class="page-header"><i class="fas fa-chromium"></i> Chromium WebView & লাইভ স্ক্যান</div>
+      <div class="webview-panel glass">
+        <webview id="mainWebview" src="https://example.com" style="width:100%; height:100%;"></webview>
+      </div>
+      <div class="map-toolbar" style="margin-top: 12px; justify-content: space-between; flex-wrap:wrap;">
+        <div>
+          <button class="cyber-btn" id="webBack"><i class="fas fa-arrow-left"></i></button>
+          <button class="cyber-btn" id="webForward"><i class="fas fa-arrow-right"></i></button>
+          <button class="cyber-btn" id="webReload"><i class="fas fa-sync-alt"></i></button>
+          <input id="webUrlInput" type="text" value="https://example.com" style="width:250px; background:#0f1420; border:1px solid cyan; border-radius:40px; padding:8px 12px;">
+          <button class="cyber-btn" id="goUrlBtn"><i class="fas fa-paper-plane"></i></button>
+        </div>
+        <div>
+          <button class="cyber-btn" id="startScanBtn"><i class="fas fa-play"></i> স্ক্যান স্টার্ট</button>
+          <button class="cyber-btn" id="stopScanBtn"><i class="fas fa-stop"></i> স্টপ</button>
+          <button class="cyber-btn" id="genReportBtn"><i class="fas fa-file-pdf"></i> রিপোর্ট নাও</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 3: Reports Library -->
+    <div id="page3" class="page">
+      <div class="page-header"><i class="fas fa-database"></i> অটো রিপোর্ট আর্কাইভ</div>
+      <div class="glass" style="padding:16px;">
+        <div style="display:flex; gap:12px; margin-bottom:16px;">
+          <input id="reportSearch" placeholder="সার্চ টার্গেট/তারিখ" class="cyber-btn" style="flex:1;">
+          <button id="bulkDownloadBtn" class="cyber-btn"><i class="fas fa-download"></i> বাল্ক ডাউন로드</button>
+          <button id="autoRefreshToggle" class="cyber-btn">🔄 অটো রিফ্রেশ (অন)</button>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="report-table" id="reportTable">
+            <thead><tr><th>#</th><th>টার্গেট</th><th>সময়</th><th>রিস্ক</th><th>অ্যাকশন</th></tr></thead>
+            <tbody id="reportTbody"><tr><td colspan="5">কোনো রিপোর্ট নেই</td></tr></tbody>
+          </table>
+        </div>
+        <div id="reportPreview" class="glass" style="margin-top:16px; padding:12px; max-height:200px; overflow:auto; font-family: monospace; font-size:12px;"></div>
+      </div>
+    </div>
+
+    <!-- PAGE 4: Tools & Exploits dashboard -->
+    <div id="page4" class="page">
+      <div class="page-header"><i class="fas fa-microchip"></i> টুলস আর্মরি (২০০+)</div>
+      <div class="glass" style="display:flex; gap:20px; padding:16px; flex-wrap:wrap;">
+        <div style="width:200px;">
+          <div class="tool-card" data-cat="recon">🔍 রিকনেসান্স</div>
+          <div class="tool-card" data-cat="exploit">💣 এক্সপ্লয়েট</div>
+          <div class="tool-card" data-cat="network">🌐 নেটওয়ার্ক</div>
+          <div class="tool-card" data-cat="cloud">☁️ ক্লাউড</div>
+        </div>
+        <div style="flex:1" id="toolsGridContainer"><div class="tools-grid" id="toolsGrid"></div></div>
+        <div style="width:220px; background:#0a0f1a; border-radius: 24px; padding:12px;">
+          <button id="runSelectedToolBtn" class="cyber-btn" style="width:100%;">▶️ রান সিলেক্টেড</button>
+          <button id="addCustomToolBtn" class="cyber-btn" style="margin-top:10px;">🆕 অ্যাড কাস্টম</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 5: System monitor & threat intel -->
+    <div id="page5" class="page">
+      <div class="page-header"><i class="fas fa-microphone-alt"></i> সিস্টেম মনিটর ও থ্রেট ফিড</div>
+      <div class="glass" style="padding:16px;">
+        <div style="display:flex; gap:20px; flex-wrap:wrap;">
+          <div><i class="fas fa-microchip"></i> CPU: <span id="cpuLoad">0%</span></div>
+          <div><i class="fas fa-memory"></i> RAM: <span id="ramUsage">0%</span></div>
+          <div><i class="fas fa-network-wired"></i> নেটওয়ার্ক: <span id="netStats">0 Mbps</span></div>
+        </div>
+        <div style="margin-top:20px;"><h4>🔥 হ্যাকার ট্র্যাকিং লগ</h4><div id="threatLog" style="height:180px; overflow:auto; background:#010101; border-radius:20px; padding:8px; font-family:monospace;"></div></div>
+      </div>
+    </div>
+
+    <!-- PAGE 6: Secret Page (Locked) -->
+    <div id="page6" class="page">
+      <div class="page-header"><i class="fas fa-user-secret"></i> প্রাইভেট ল্যাব [লকড]</div>
+      <div class="glass" style="padding:20px; text-align:center;">
+        <i class="fas fa-lock" style="font-size:48px;"></i>
+        <p>অ্যাক্সেস করতে পাসকোড দিন:</p>
+        <input type="password" id="secretPass" placeholder="কোড লিখুন" class="cyber-btn" style="width:200px;">
+        <button id="unlockSecretBtn" class="cyber-btn">আনলক</button>
+        <div id="secretContent" style="display:none; margin-top:20px; text-align:left;">
+          <p>✅ ব্যক্তিগত টুলস ড্রয়ার</p>
+          <p>✅ জিরো-ডে পেলোড স্টোর</p>
+          <p>✅ বাগ বাউন্টি ক্রেডেনশিয়াল (এনক্রিপ্টেড)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 7: Automation hub (bonus features) -->
+    <div id="page7" class="page">
+      <div class="page-header"><i class="fas fa-cogs"></i> অ্যাডভান্সড অটোমেশন হাব</div>
+      <div class="glass" style="padding:20px;">
+        <div class="map-toolbar" style="justify-content:center;">🤖 এসকল ফিচার শীঘ্রই সক্রিয় হবে (এআই ড্রাইভেন)</div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:10px; margin-top:16px;">
+          <button class="cyber-btn"><i class="fas fa-envelope"></i> অটো রিপোর্ট ডেলিভারি</button>
+          <button class="cyber-btn"><i class="fas fa-cloud-upload-alt"></i> ক্লাউড সিঙ্ক</button>
+          <button class="cyber-btn"><i class="fab fa-telegram"></i> টেলিগ্রাম বট</button>
+          <button class="cyber-btn"><i class="fas fa-chart-line"></i> এআই প্রেডিক্টর</button>
+          <button class="cyber-btn"><i class="fas fa-skull"></i> ডার্কওয়েব মনিটর</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AI Assistant floating button + modal -->
+<div class="ai-assistant-btn" id="aiAssistantBtn">
+  <i class="fas fa-robot"></i>
+</div>
+<div class="ai-modal" id="aiModal">
+  <div style="display:flex; justify-content:space-between;"><span><i class="fas fa-brain"></i> Shadow AI</span><span id="closeAiModal" style="cursor:pointer;">✖</span></div>
+  <div style="margin-top:12px;" id="aiResponse">🤖 হ্যালো! আমি আপনার AI অ্যাসিস্ট্যান্ট। যেকোনো কাজ বলুন (ব্রাউজার ওপেন, ফাইল তৈরি, স্ক্যান...)</div>
+  <input type="text" id="aiCommandInput" placeholder="কমান্ড দিন..." class="cyber-btn" style="width:100%; margin-top:10px;">
+  <button id="sendAiCommand" class="cyber-btn" style="margin-top:8px;">প্রেরণ</button>
+</div>
+
+<script>
+  // --------------------------------------------------------------
+  // Leaflet World Map initialization
+  let map = L.map('worldMap').setView([20, 0], 2);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+  }).addTo(map);
+  let markersLayer = L.layerGroup().addTo(map);
+  let liveMarkers = [];
+
+  function addIpMarker(ip, lat, lng, color = 'green') {
+    let iconColor = color === 'green' ? 'green' : (color === 'orange' ? 'orange' : 'red');
+    let marker = L.circleMarker([lat, lng], { radius: 8, color: iconColor, fillOpacity: 0.7 }).bindPopup(`IP: ${ip}<br>থ্রেট: ${color}`);
+    marker.addTo(markersLayer);
+    liveMarkers.push(marker);
+  }
+
+  // demo mock marker
+  addIpMarker('8.8.8.8', 37.386, -122.083, 'green');
+
+  document.getElementById('clearMarkersBtn').onclick = () => { markersLayer.clearLayers(); liveMarkers = []; };
+  document.getElementById('screenshotMapBtn').onclick = () => alert('🖼️ স্ক্রিনশট ফিচার শীঘ্রই আসছে (সত্যিকারে canvas capture)');
+
+  // ip tracker mock
+  document.getElementById('locateIpBtn').onclick = () => {
+    let ip = document.getElementById('ipLocatorInput').value.trim();
+    if(ip) alert(`[ডেমো] ${ip} এর লোকেশন (মস্কো, রাশিয়া) মানচিত্রে যোগ করা হলো।`);
+    addIpMarker(ip, 55.7558, 37.6173, 'orange');
+  };
+
+  // ------------------- Webview controls ------------------
+  const webview = document.getElementById('mainWebview');
+  document.getElementById('webBack').onclick = () => webview.goBack();
+  document.getElementById('webForward').onclick = () => webview.goForward();
+  document.getElementById('webReload').onclick = () => webview.reload();
+  document.getElementById('goUrlBtn').onclick = () => {
+    let url = document.getElementById('webUrlInput').value;
+    if(!url.startsWith('http')) url = 'https://'+url;
+    webview.src = url;
+  };
+
+  // scan simulation
+  document.getElementById('startScanBtn').onclick = () => alert('🚀 ব্যাকগ্রাউন্ড স্ক্যান শুরু (২০০+ টুলস প্যারালালে)');
+  document.getElementById('stopScanBtn').onclick = () => alert('⏹️ স্ক্যান থামানো হলো');
+  document.getElementById('genReportBtn').onclick = () => {
+    let newReport = { target: webview.src || 'example.com', time: new Date().toLocaleString(), risk: 'Medium' };
+    addReportToTable(newReport);
+  };
+
+  function addReportToTable(report) {
+    let tbody = document.getElementById('reportTbody');
+    let row = tbody.insertRow(0);
+    row.insertCell(0).innerText = Math.floor(Math.random()*999);
+    row.insertCell(1).innerText = report.target;
+    row.insertCell(2).innerText = report.time;
+    row.insertCell(3).innerHTML = `<span style="color:#ffcc33;">${report.risk}</span>`;
+    let btn = document.createElement('button');
+    btn.innerText = 'প্রিভিউ';
+    btn.className = 'cyber-btn';
+    btn.onclick = () => document.getElementById('reportPreview').innerHTML = `<pre>রিপোর্ট ডিটেইলস for ${report.target}</pre>`;
+    let cell = row.insertCell(4);
+    cell.appendChild(btn);
+    if(tbody.children.length>20) tbody.deleteRow(20);
+  }
+
+  // tools mock data
+  const toolsList = [
+    {name:"সাবডোমেইন স্ক্যান", cat:"recon"},{name:"SQLi অটো", cat:"exploit"},{name:"পোর্ট স্ক্যান", cat:"network"},
+    {name:"AWS S3 স্ক্যান", cat:"cloud"},{name:"XSS ফাজার", cat:"exploit"},{name:"ওএস ফিঙ্গারপ্রিন্ট", cat:"network"}
+  ];
+  function renderTools(category) {
+    let grid = document.getElementById('toolsGrid');
+    grid.innerHTML = '';
+    toolsList.filter(t => t.cat===category || category==='all').forEach(t => {
+      let card = document.createElement('div');
+      card.className = 'tool-card';
+      card.innerText = t.name;
+      card.onclick = () => alert(`টুল ${t.name} রান করা হচ্ছে (ডেমো)`);
+      grid.appendChild(card);
+    });
+  }
+  document.querySelectorAll('[data-cat]').forEach(btn => {
+    btn.onclick = () => renderTools(btn.getAttribute('data-cat'));
+  });
+  renderTools('recon');
+  document.getElementById('runSelectedToolBtn').onclick = () => alert('সিলেক্টেড টুল ব্যাকগ্রাউন্ডে রান হবে');
+  document.getElementById('addCustomToolBtn').onclick = () => alert('কাস্টম টুল এডিটর শীঘ্রই আসছে');
+
+  // system monitor dummy
+  setInterval(() => {
+    let cpu = Math.floor(Math.random() * 50 + 10);
+    let ram = Math.floor(Math.random() * 60 + 20);
+    document.getElementById('cpuLoad').innerText = cpu+'%';
+    document.getElementById('ramUsage').innerText = ram+'%';
+    let logDiv = document.getElementById('threatLog');
+    if(Math.random() > 0.8) logDiv.innerHTML = `<div>[${new Date().toLocaleTimeString()}] সন্দেহজনক IP 45.33.22.11 - ব্রুটফোর্স চেষ্টা</div>` + logDiv.innerHTML;
+  }, 4000);
+
+  // secret page unlock
+  document.getElementById('unlockSecretBtn').onclick = () => {
+    let pass = document.getElementById('secretPass').value;
+    if(pass === 'shadowrecon2025') document.getElementById('secretContent').style.display = 'block';
+    else alert('ভুল কোড');
+  };
+  document.getElementById('secretLockIcon').onclick = () => document.querySelector('[data-page="page6"]').click();
+
+  // navigation between pages
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      let pageId = item.getAttribute('data-page');
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+
+  // AI Assistant Modal (Floating)
+  const aiBtn = document.getElementById('aiAssistantBtn');
+  const aiModal = document.getElementById('aiModal');
+  const closeAi = document.getElementById('closeAiModal');
+  const aiInput = document.getElementById('aiCommandInput');
+  const sendAi = document.getElementById('sendAiCommand');
+  const aiResponseDiv = document.getElementById('aiResponse');
+
+  aiBtn.onclick = () => { aiModal.style.display = 'block'; };
+  closeAi.onclick = () => { aiModal.style.display = 'none'; };
+  sendAi.onclick = () => {
+    let cmd = aiInput.value.trim();
+    if(!cmd) return;
+    aiResponseDiv.innerHTML = `🤖 প্রক্রিয়াকরণ: "${cmd}"<br>✅ সম্পন্ন (সিমুলেশন) - আসল AI ব্যাকএন্ড যুক্ত হবে।`;
+    aiInput.value = '';
+  };
+  // close modal on outside click?
+  window.onclick = (e) => { if(e.target === aiModal) aiModal.style.display = 'none'; };
+</script>
+</body>
+</html>
