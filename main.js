@@ -1,15 +1,15 @@
 // =================================================================================
-// SHADOWRECON ULTIMATE – FINAL MAIN PROCESS (ALL 20,000+ TOOLS INTEGRATED)
-// ফাইল: main.js | স্বয়ংক্রিয়ভাবে সব মডিউল লোড করে, ওয়েবভিউ ট্রাফিক ক্যাপচার করে
+// SHADOWRECON ULTIMATE – AUTO-LOADER FOR 20,000+ TOOLS (MODULES INTEGRATION)
+// ফাইল: main.js | স্বয়ংক্রিয়ভাবে সব মডিউল লোড করে, টুল ফাংশন আবিষ্কার করে
 // =================================================================================
 
-const { app, BrowserWindow, ipcMain, dialog, shell, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 
-// ========================== গ্লোবাল ফিউশন ডাটা ==========================
+// গ্লোবাল ফিউশন ডাটা (শেয়ার্ড স্টেট)
 global.fusionData = {
   meta: { appTitle: 'ShadowRecon Ultimate', version: app.getVersion(), createdAt: new Date().toISOString() },
   target: { url: '', host: '', origin: '' },
@@ -19,15 +19,13 @@ global.fusionData = {
   reportsIndex: []
 };
 
-// ========================== সব মডিউল লোড করার ফাংশন ==========================
-const loadedModules = {}; // নাম -> মডিউল এক্সপোর্ট অবজেক্ট
-const allTools = [];      // { id, name, category, module, functionName }
+// ========================== সব মডিউল লোড করে টুল সংগ্রহ ==========================
+let allTools = []; // প্রতিটি টুল: { id, name, category, moduleName, functionName, fn, isScanner }
 
 function loadAllModules() {
   const modulesDir = path.join(__dirname, 'modules');
   if (!fs.existsSync(modulesDir)) {
-    console.warn('modules folder not found, creating empty');
-    fs.mkdirSync(modulesDir, { recursive: true });
+    console.warn('modules folder not found');
     return;
   }
   const files = fs.readdirSync(modulesDir).filter(f => f.endsWith('.js'));
@@ -35,83 +33,41 @@ function loadAllModules() {
     try {
       const modulePath = path.join(modulesDir, file);
       const mod = require(modulePath);
-      loadedModules[file] = mod;
-      console.log(`✅ Loaded module: ${file}`);
+      console.log(`Loaded: ${file}`);
 
-      // প্রতিটি মডিউলে থাকতে পারে একাধিক টুল ফাংশন (যেমন deepSecretDetector, trafficAnomaly ইত্যাদি)
-      // আমরা সেগুলোকে টুল হিসাবে নিবন্ধন করি
+      // মডিউলের সব এক্সপোর্ট করা প্রপার্টি স্ক্যান করি
       for (const [key, value] of Object.entries(mod)) {
-        if (typeof value === 'function' && !key.startsWith('run')) {
-          // ফাংশনটিকে টুল হিসেবে চিহ্নিত করি
+        // শুধু ফাংশন নিবন্ধন করি
+        if (typeof value === 'function') {
+          const toolId = `${file.replace('.js', '')}_${key}`;
+          let category = file.replace('.js', '');
+          let name = `${key} (${category})`;
+          // বিশেষ করে run দিয়ে শুরু ফাংশনগুলোকে স্ক্যানার টাইপ দেই
+          const isScanner = key.startsWith('run');
           allTools.push({
-            id: `${file}_${key}`,
-            name: `${key} (${file})`,
-            category: file.replace('.js', ''),
-            moduleFile: file,
-            functionName: key,
-            fn: value
-          });
-        }
-      }
-      // এছাড়া যদি মডিউলে runXxx ফাংশন থাকে (যেমন runWebScanner), সেগুলোকে স্ক্যানার হিসেবে আলাদা রাখি
-      for (const [key, value] of Object.entries(mod)) {
-        if (typeof value === 'function' && key.startsWith('run')) {
-          allTools.push({
-            id: `${file}_${key}`,
-            name: `${key} (Full Scanner)`,
-            category: file.replace('.js', ''),
-            moduleFile: file,
+            id: toolId,
+            name: name,
+            category: category,
+            moduleName: file,
             functionName: key,
             fn: value,
-            isScanner: true
+            isScanner: isScanner
           });
         }
       }
     } catch (err) {
-      console.error(`Failed to load module ${file}:`, err);
+      console.error(`Error loading module ${file}:`, err);
     }
   }
-  console.log(`Total tools loaded from modules: ${allTools.length}`);
+  console.log(`Total tools registered: ${allTools.length}`);
 }
 
-// কাস্টম টুলস ডিরেক্টরি (ইউজার এডিটেবল) হ্যান্ডলিং
-function getCustomDir() { return path.join(app.getPath('userData'), 'shadowrecon_custom'); }
-function ensureCustomFilesExist() {
-  const dir = getCustomDir();
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const customModulesPath = path.join(dir, 'customModules.js');
-  const toolRunnerPath = path.join(dir, 'toolRunner.js');
-  if (!fs.existsSync(customModulesPath)) {
-    fs.writeFileSync(customModulesPath, `// customModules.js - আপনার কাস্টম টুল ফাংশন লিখুন\nasync function getCustomModules() { return {}; }\nmodule.exports = { getCustomModules };`);
-  }
-  if (!fs.existsSync(toolRunnerPath)) {
-    fs.writeFileSync(toolRunnerPath, `// toolRunner.js - কাস্টম টুল রান করার লজিক\nasync function runCustomTools({ modules, fusionData, emitFeed }) { return { ok: true }; }\nmodule.exports = { runCustomTools };`);
-  }
-  return { dir, customModulesPath, toolRunnerPath };
-}
-
-// ========================== ডিফেন্সিভ চেক ও রিপোর্ট (সংক্ষিপ্ত) ==========================
-// এখানে আগের ডিফেন্সিভ চেকের ফাংশনগুলো থাকবে (আমি সংক্ষেপে দিচ্ছি, তবে আপনার আগের কোডই বসাতে হবে)
-// বাস্তবে আপনি আপনার আগের দেওয়া runDefensiveChecks, compressAllReports ইত্যাদি এখানে বসাবেন।
-// আমি শুধু স্টাব দিচ্ছি, কিন্তু আপনি চাইলে পুরো ফাংশন কপি করে নিতে পারেন।
-
-async function runDefensiveChecks(win, targetUrl) {
-  // এখানে আপনার আগের সম্পূর্ণ ডিফেন্সিভ চেকের কোড বসবে
-  // সংক্ষেপে ডেমো
-  console.log('Running defensive checks on', targetUrl);
-  return { baseName: 'demo_report' };
-}
-
-async function compressAllReports(win) {
-  console.log('Compressing reports');
-  return { ok: true, path: 'dummy.zip' };
-}
-
-// ========================== ট্রাফিক অবজার্ভার (ওয়েবভিউ ইন্টারসেপ্ট) ==========================
+// ========================== ওয়েবভিউ ট্রাফিক অবজার্ভার ==========================
 function setupTrafficObservation(win, wcSession) {
   wcSession.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {
     const entry = { ts: new Date().toISOString(), type: 'request', url: details.url, method: details.method };
     global.fusionData.traffic.events.push(entry);
+    global.fusionData.traffic.totalRequests++;
     if (global.fusionData.traffic.events.length > 5000) global.fusionData.traffic.events.shift();
     win.webContents.send('traffic:event', entry);
     callback({ cancel: false });
@@ -119,21 +75,20 @@ function setupTrafficObservation(win, wcSession) {
   wcSession.webRequest.onHeadersReceived({ urls: ['<all_urls>'] }, (details, callback) => {
     const entry = { ts: new Date().toISOString(), type: 'response', url: details.url, status: details.statusCode };
     global.fusionData.traffic.events.push(entry);
+    global.fusionData.traffic.totalResponses++;
     if (global.fusionData.traffic.events.length > 5000) global.fusionData.traffic.events.shift();
     win.webContents.send('traffic:event', entry);
     callback({ cancel: false });
   });
 }
 
-// ========================== উইন্ডো তৈরি ==========================
+// ওয়েবভিউ সেশন ট্র্যাকিং
 let mainWindow = null;
 let trafficHookedSessions = new Set();
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1600, height: 1000,
-    backgroundColor: '#0b0f14',
-    title: 'ShadowRecon Ultimate – 20,000+ Tools',
+    width: 1600, height: 1000, backgroundColor: '#0b0f14', title: 'ShadowRecon Ultimate – 20k Tools',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -147,23 +102,38 @@ function createWindow() {
   // mainWindow.webContents.openDevTools();
 
   mainWindow.webContents.on('did-attach-webview', (event, webviewWebContents) => {
-    const s = webviewWebContents.session;
-    const key = s.id || crypto.randomUUID();
+    const sess = webviewWebContents.session;
+    const key = sess.id || crypto.randomUUID();
     if (!trafficHookedSessions.has(key)) {
       trafficHookedSessions.add(key);
-      setupTrafficObservation(mainWindow, s);
+      setupTrafficObservation(mainWindow, sess);
     }
   });
-  const s0 = mainWindow.webContents.session;
-  if (s0 && !trafficHookedSessions.has(s0.id)) {
-    trafficHookedSessions.add(s0.id);
-    setupTrafficObservation(mainWindow, s0);
+  const mainSession = mainWindow.webContents.session;
+  if (mainSession && !trafficHookedSessions.has(mainSession.id)) {
+    trafficHookedSessions.add(mainSession.id);
+    setupTrafficObservation(mainWindow, mainSession);
   }
 }
 
-// ========================== IPC হ্যান্ডলার (টুলস ও অন্যান্য) ==========================
+// ========================== কাস্টম ইউজার টুলস (customModules.js) ==========================
+function getCustomDir() { return path.join(app.getPath('userData'), 'shadowrecon_custom'); }
+function ensureCustomFilesExist() {
+  const dir = getCustomDir();
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const customModulesPath = path.join(dir, 'customModules.js');
+  const toolRunnerPath = path.join(dir, 'toolRunner.js');
+  if (!fs.existsSync(customModulesPath)) {
+    fs.writeFileSync(customModulesPath, `// customModules.js\nasync function getCustomModules() { return {}; }\nmodule.exports = { getCustomModules };`);
+  }
+  if (!fs.existsSync(toolRunnerPath)) {
+    fs.writeFileSync(toolRunnerPath, `// toolRunner.js\nasync function runCustomTools({ modules, fusionData, emitFeed }) { return { ok: true }; }\nmodule.exports = { runCustomTools };`);
+  }
+  return { dir, customModulesPath, toolRunnerPath };
+}
 
-// সকল টুলের তালিকা পাঠানো
+// ========================== আইপিসি হ্যান্ডলার (ইউআই থেকে কল) ==========================
+// সব টুলের তালিকা
 ipcMain.handle('tool:list', async (event, category = null) => {
   if (category) {
     return allTools.filter(t => t.category === category).map(t => ({ id: t.id, name: t.name, category: t.category }));
@@ -171,52 +141,51 @@ ipcMain.handle('tool:list', async (event, category = null) => {
   return allTools.map(t => ({ id: t.id, name: t.name, category: t.category }));
 });
 
-// একটি নির্দিষ্ট টুল রান করা
+// নির্দিষ্ট টুল রান করা
 ipcMain.handle('tool:run', async (event, toolId) => {
   const tool = allTools.find(t => t.id === toolId);
   if (!tool) return { error: 'Tool not found' };
   try {
-    // টুল ফাংশন কল করি, সাথে targetUrl (বর্তমান ওয়েবভিউ URL) এবং fusionData পাঠাই
     const targetUrl = global.fusionData.target.url || 'https://example.com';
-    const result = await tool.fn({ targetUrl, fusionData: global.fusionData, emitFeed: (level, msg) => {
-      mainWindow?.webContents.send('feed:item', { level, message: msg });
-    } });
-    return { success: true, output: result, tool: tool.name };
+    // ফাংশনটি targetUrl প্যারামিটার নেয় কিনা চেক করে কল করি (অধিকাংশ আমাদের টুল ফাংশন { targetUrl, fusionData, emitFeed } নেয়)
+    // আমরা ধরে নিচ্ছি সব টুল ফাংশন প্রথম প্যারামিটার হিসেবে অবজেক্ট নেয় { targetUrl, fusionData, emitFeed }
+    const result = await tool.fn({
+      targetUrl: targetUrl,
+      fusionData: global.fusionData,
+      emitFeed: (level, message) => {
+        if (mainWindow) mainWindow.webContents.send('feed:item', { level, message });
+      }
+    });
+    return { success: true, output: result, toolName: tool.name };
   } catch (err) {
     return { error: err.message };
   }
 });
 
-// ডিফেন্সিভ চেক
+// ডিফেন্সিভ চেক (স্টাব, আপনি আগের কোড বসাতে পারেন)
 ipcMain.handle('defensive:run', async (event, { targetUrl }) => {
   if (!mainWindow) return { ok: false, error: 'no-window' };
   try {
-    const artifacts = await runDefensiveChecks(mainWindow, targetUrl);
-    return { ok: true, artifacts };
-  } catch (e) { return { ok: false, error: e.message }; }
+    // আপনার আসল defensive চেক এখানে
+    console.log('Defensive checks running on', targetUrl);
+    return { ok: true, artifacts: { baseName: 'demo' } };
+  } catch(e) { return { ok: false, error: e.message }; }
 });
 
-// রিপোর্ট কম্প্রেস
-ipcMain.handle('reports:compress', async () => {
-  if (!mainWindow) return { ok: false };
-  return await compressAllReports(mainWindow);
-});
+// রিপোর্ট কম্প্রেস (স্টাব)
+ipcMain.handle('reports:compress', async () => ({ ok: true, path: 'dummy.zip' }));
 
-// কাস্টম টুলস (ইউজার customModules.js)
+// কাস্টম টুলস রান
 ipcMain.handle('custom:run', async () => {
   const { customModulesPath, toolRunnerPath } = ensureCustomFilesExist();
   try {
     const customMod = require(customModulesPath);
     const toolRunner = require(toolRunnerPath);
-    if (!customMod.getCustomModules || !toolRunner.runCustomTools) throw new Error('Invalid custom files');
+    if (!customMod.getCustomModules || !toolRunner.runCustomTools) throw new Error('Invalid');
     const modules = await customMod.getCustomModules();
-    const result = await toolRunner.runCustomTools({ modules, fusionData: global.fusionData, emitFeed: (level,msg) => {
-      mainWindow?.webContents.send('feed:item', { level, message: msg });
-    } });
+    const result = await toolRunner.runCustomTools({ modules, fusionData: global.fusionData, emitFeed: (level,msg) => mainWindow?.webContents.send('feed:item', { level, message: msg }) });
     return { ok: true, result };
-  } catch(e) {
-    return { ok: false, message: e.message };
-  }
+  } catch(e) { return { ok: false, error: e.message }; }
 });
 
 // ফিউশন ডাটা
@@ -234,7 +203,7 @@ ipcMain.handle('settings:get', () => {
 ipcMain.handle('settings:read', async (event, { kind }) => {
   const { customModulesPath, toolRunnerPath } = ensureCustomFilesExist();
   const filePath = kind === 'customModules' ? customModulesPath : toolRunnerPath;
-  try { const content = fs.readFileSync(filePath, 'utf8'); return { ok: true, content }; }
+  try { return { ok: true, content: fs.readFileSync(filePath, 'utf8') }; }
   catch(e) { return { ok: false, error: e.message }; }
 });
 ipcMain.handle('settings:write', async (event, { kind, content }) => {
@@ -249,21 +218,23 @@ ipcMain.handle('settings:open', async (event, { kind }) => {
   return shell.openPath(target);
 });
 
-// অতিরিক্ত হ্যান্ডলার (এক্সপ্লয়েট, নেটওয়ার্ক, সিস্টেম ইত্যাদি – ডামি)
+// অন্যান্য ডামি হ্যান্ডলার (UI ত্রুটি এড়াতে)
 ipcMain.handle('exploit:list', async () => []);
 ipcMain.handle('exploit:run', async () => ({}));
 ipcMain.handle('system:info', async () => ({ platform: os.platform(), arch: os.arch(), cpus: os.cpus().length }));
-ipcMain.handle('system:command', async (event, cmd) => ({ stdout: '', stderr: '', error: null }));
-ipcMain.handle('threat:check', async (event, ip) => ({ level: 'safe', score: 10 }));
+ipcMain.handle('system:command', async () => ({ stdout: '', stderr: '' }));
+ipcMain.handle('threat:check', async () => ({ level: 'safe' }));
 ipcMain.handle('report:generate', async () => ({ baseName: 'report' }));
+ipcMain.handle('network:capture:start', async () => ({ active: true }));
+ipcMain.handle('network:capture:stop', async () => ({}));
 
 // ========================== অ্যাপ লাইফসাইকেল ==========================
 app.whenReady().then(() => {
-  loadAllModules();          // মডিউল ফোল্ডার থেকে সব টুলস লোড
+  loadAllModules();       // সব টুল লোড
   ensureCustomFilesExist();
   createWindow();
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 
-console.log(`✅ main.js সম্পূর্ণ লোড – মোট টুলস: ${allTools.length} টি (প্রায় ২০,০০০+)`);
+console.log(`✅ main.js loaded. Total tools discovered: ${allTools.length}`);
